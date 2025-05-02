@@ -38,6 +38,31 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Change Password Endpoint
+app.post('/api/change-password', async (req, res) => {
+  const { email, oldPassword, newPassword } = req.body;
+
+  try {
+    const result = await db.query('SELECT password_hash FROM users WHERE email = $1', [email]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, result.rows[0].password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Old password is incorrect' });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await db.query('UPDATE users SET password_hash = $1 WHERE email = $2', [newHash, email]);
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
