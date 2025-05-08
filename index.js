@@ -63,6 +63,28 @@ app.post('/api/change-password', async (req, res) => {
   }
 });
 
+// Schedule Endpoint (fetch schedule)
+app.post('/api/schedule', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const result = await db.query(
+      'SELECT date, status, time_range FROM schedules WHERE email = $1 ORDER BY date',
+      [email]
+    );
+
+    const schedules = result.rows.map(row => ({
+      date: row.date,
+      status: row.status,
+      timeRange: row.time_range
+    }));
+
+    res.json({ schedules });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch schedules', error: err.message });
+  }
+});
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
