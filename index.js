@@ -90,6 +90,50 @@ app.post('/api/schedule', async (req, res) => {
   }
 });
 
+// Request Leave Endpoint
+// Body: { email: string, date: 'YYYY-MM-DD', timeRange?: string }
+// If the schedule row already exists, change its status to 'pending'.
+// Otherwise insert a new row with status = 'pending'.
+app.post('/api/request-leave', async (req, res) => {
+  const { email, date, timeRange = '09:00 - 17:00' } = req.body;
+
+  try {
+    const updateResult = await db.query(
+      'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3',
+      ['pending', email, date]
+    );
+
+    // If no row was updated, create one.
+    if (updateResult.rowCount === 0) {
+      await db.query(
+        'INSERT INTO schedules (email, date, status, time_range) VALUES ($1, $2, $3, $4)',
+        [email, date, 'pending', timeRange]
+      );
+    }
+
+    res.json({ message: 'Leave requested', date });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to request leave', error: err.message });
+  }
+});
+
+// Cancel Leave Endpoint
+// Body: { email: string, date: 'YYYY-MM-DD' }
+// Revert the status back to 'work'.
+app.post('/api/cancel-leave', async (req, res) => {
+  const { email, date } = req.body;
+
+  try {
+    await db.query(
+      'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3',
+      ['work', email, date]
+    );
+    res.json({ message: 'Leave canceled', date });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to cancel leave', error: err.message });
+  }
+});
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
