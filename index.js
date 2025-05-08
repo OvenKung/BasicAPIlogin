@@ -134,6 +134,23 @@ app.post('/api/cancel-leave', async (req, res) => {
   }
 });
 
+// Add Schedule Endpoint
+// Body: { email: string, date: 'YYYY-MM-DD', timeRange: string, status: string }
+app.post('/api/add-schedule', async (req, res) => {
+  const { email, date, timeRange, status } = req.body;
+
+  try {
+    await db.query(
+      'INSERT INTO schedules (email, date, time_range, status) VALUES ($1, $2, $3, $4)',
+      [email, date, timeRange, status]
+    );
+
+    res.json({ message: 'Schedule added successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to add schedule', error: err.message });
+  }
+});
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
