@@ -195,6 +195,31 @@ app.post('/api/reject-leave', async (req, res) => {
   }
 });
 
+// Update Leave Status Endpoint (Unified for Approve/Reject)
+// Body: { email: string, date: 'YYYY-MM-DD', status: 'leave' | 'work' }
+app.post('/api/update-leave-status', async (req, res) => {
+  const { email, date, status } = req.body;
+
+  if (!email || !date || !status) {
+    return res.status(400).json({ message: 'Missing email, date, or status' });
+  }
+
+  try {
+    const result = await db.query(
+      'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3 AND status = $4',
+      [status, email, date, 'pending']
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'No pending schedule found to update' });
+    }
+
+    res.json({ message: `Status updated to '${status}'`, date });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update status', error: err.message });
+  }
+});
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
