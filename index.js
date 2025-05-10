@@ -151,6 +151,38 @@ app.post('/api/add-schedule', async (req, res) => {
   }
 });
 
+// Approve Leave Endpoint
+// Body: { email: string, date: 'YYYY-MM-DD' }
+app.post('/api/approve-leave', async (req, res) => {
+  const { email, date } = req.body;
+
+  try {
+    await db.query(
+      'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3 AND status = $4',
+      ['leave', email, date, 'pending']
+    );
+    res.json({ message: 'Leave approved', date });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to approve leave', error: err.message });
+  }
+});
+
+// Reject Leave Endpoint
+// Body: { email: string, date: 'YYYY-MM-DD' }
+app.post('/api/reject-leave', async (req, res) => {
+  const { email, date } = req.body;
+
+  try {
+    await db.query(
+      'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3 AND status = $4',
+      ['work', email, date, 'pending']
+    );
+    res.json({ message: 'Leave rejected', date });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reject leave', error: err.message });
+  }
+});
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
