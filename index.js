@@ -68,22 +68,26 @@ app.post('/api/change-password', async (req, res) => {
   }
 });
 
-// Schedule Endpoint (fetch schedule)
 app.post('/api/schedule', async (req, res) => {
   const { email } = req.body;
+  console.log("📩 Email received:", email); // ✅ LOG นี้ดูว่าค่าเป็นอะไร
 
   try {
     let result;
-    if (email) {
+    if (email && email !== '*') {
+      console.log("🔍 Query for specific user...");
       result = await db.query(
         'SELECT email, date, status, time_range FROM schedules WHERE email = $1 ORDER BY date',
         [email]
       );
     } else {
+      console.log("🔍 Query for all pending...");
       result = await db.query(
         "SELECT email, date, status, time_range FROM schedules WHERE status = 'pending' ORDER BY date"
       );
     }
+
+    console.log("📦 Result:", result.rows); // ✅ LOG ดูผลลัพธ์
 
     const schedules = result.rows.map(row => ({
       email: row.email,
@@ -94,10 +98,10 @@ app.post('/api/schedule', async (req, res) => {
 
     res.json({ schedules });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Failed to fetch schedules', error: err.message });
   }
 });
-
 // Request Leave Endpoint
 // Body: { email: string, date: 'YYYY-MM-DD', timeRange?: string }
 // If the schedule row already exists, change its status to 'pending'.
