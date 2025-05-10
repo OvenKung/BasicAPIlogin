@@ -73,12 +73,20 @@ app.post('/api/schedule', async (req, res) => {
   const { email } = req.body;
 
   try {
-    const result = await db.query(
-      'SELECT date, status, time_range FROM schedules WHERE email = $1 ORDER BY date',
-      [email]
-    );
+    let result;
+    if (email) {
+      result = await db.query(
+        'SELECT email, date, status, time_range FROM schedules WHERE email = $1 ORDER BY date',
+        [email]
+      );
+    } else {
+      result = await db.query(
+        "SELECT email, date, status, time_range FROM schedules WHERE status = 'pending' ORDER BY date"
+      );
+    }
 
     const schedules = result.rows.map(row => ({
+      email: row.email,
       date: row.date,
       status: row.status,
       timeRange: row.time_range
