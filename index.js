@@ -255,40 +255,35 @@ app.post('/api/update-leave-status', async (req, res) => {
 // Check-In Endpoint
 // Body: { email: string, date: 'YYYY-MM-DD' }
 app.post('/api/checkin', async (req, res) => {
-  const { email, date } = req.body;
+  const { email, date, status } = req.body;
+
+  if (!email || !date || !status) {
+    return res.status(400).json({ message: 'Missing data' });
+  }
 
   try {
     const result = await db.query(
-      'SELECT status, time_range FROM schedules WHERE email = $1 AND date = $2',
+      'SELECT status FROM schedules WHERE email = $1 AND date = $2',
       [email, date]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: '❌ ไม่พบตารางงานในวันนี้' });
+      return res.status(404).json({ message: 'Schedule not found' });
     }
 
-    const { status, time_range } = result.rows[0];
-
-    if (status !== 'work') {
-      return res.status(400).json({ message: `⚠️ ไม่สามารถเช็คอินได้ สถานะ: ${status}` });
-    }
-
-    const [startStr, endStr] = time_range.split(' - ');
-    const now = new Date();
-    const nowTime = now.toTimeString().slice(0, 5); // "HH:mm"
-
-    if (nowTime < startStr || nowTime > endStr) {
-      return res.status(400).json({ message: `⏰ เช็คอินได้เฉพาะเวลา ${startStr} - ${endStr}` });
+    const currentStatus = result.rows[0].status;
+    if (currentStatus !== 'work') {
+      return res.status(400).json({ message: `Cannot check in. Current status: ${currentStatus}` });
     }
 
     await db.query(
       'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3',
-      ['checked-in', email, date]
+      [status, email, date]
     );
 
-    res.json({ message: '✅ เช็คอินสำเร็จ', date });
+    res.json({ message: `Check-in successful: ${status}`, date });
   } catch (err) {
-    res.status(500).json({ message: '❌ เกิดข้อผิดพลาด', error: err.message });
+    res.status(500).json({ message: 'Server error', error: err.message });
   }
 });
 
