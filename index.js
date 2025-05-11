@@ -220,6 +220,31 @@ app.post('/api/update-leave-status', async (req, res) => {
   }
 });
 
+// Check-In Endpoint
+// Body: { email: string, date: 'YYYY-MM-DD' }
+app.post('/api/checkin', async (req, res) => {
+  const { email, date } = req.body;
+
+  if (!email || !date) {
+    return res.status(400).json({ message: 'Missing email or date' });
+  }
+
+  try {
+    const result = await db.query(
+      'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3 AND status = $4',
+      ['checked-in', email, date, 'work']
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'No matching schedule found to check in' });
+    }
+
+    res.json({ message: 'Check-in successful', date });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to check in', error: err.message });
+  }
+});
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
