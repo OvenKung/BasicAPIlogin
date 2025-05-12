@@ -10,11 +10,14 @@ app.use(bodyParser.json());
 
 // Register Endpoint
 app.post('/api/register', async (req, res) => {
-  const { email, password, role = 'user', fullname } = req.body;
+  const { email, password, role = 'user', fullname, imageUrl } = req.body;
   const hash = await bcrypt.hash(password, 10);
 
   try {
-    await db.query('INSERT INTO users (email, password_hash, role, fullname) VALUES ($1, $2, $3, $4)', [email, hash, role, fullname]);
+    await db.query(
+      'INSERT INTO users (email, password_hash, role, fullname, image_url) VALUES ($1, $2, $3, $4, $5)',
+      [email, hash, role, fullname, imageUrl]
+    );
     res.json({ message: 'User registered' });
   } catch (err) {
     res.status(400).json({ message: 'User may already exist', error: err.message });
