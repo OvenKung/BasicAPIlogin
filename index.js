@@ -104,34 +104,32 @@ app.post('/api/schedule', async (req, res) => {
 });
 // ✅ GET schedule by email and date (used for QR scan)
 app.get('/api/schedule', async (req, res) => {
-  const { email, date } = req.query;
-
-  if (!email || !date) {
-    return res.status(400).json({ message: 'Missing email or date' });
-  }
+  const { email = '*', date } = req.query;
+  if (!date) return res.status(400).json({ message: 'Missing date' });
 
   try {
-    const result = await db.query(
-      'SELECT email, date, status, time_range FROM schedules WHERE email = $1 AND date = $2',
-      [email, date]
-    );
+    const q = email === '*'
+      ? await db.query(
+          'SELECT email, date, status, time_range FROM schedules WHERE date = $1 ORDER BY email',
+          [date]
+        )
+      : await db.query(
+          'SELECT email, date, status, time_range FROM schedules WHERE email = $1 AND date = $2',
+          [email, date]
+        );
 
-    if (result.rows.length === 0) {
+    if (q.rows.length === 0)
       return res.status(404).json({ message: 'Schedule not found' });
-    }
 
-    const row = result.rows[0];
-    const [startTime, endTime] = row.time_range.split(' - ');
-
-    res.json({
-      email: row.email,
-      date: row.date,
-      status: row.status,
-      startTime,
-      endTime
+    // ส่งออกเป็น array สม่ำเสมอ
+    const schedules = q.rows.map(r => {
+      const [startTime, endTime] = r.time_range.split(' - ');
+      return { email: r.email, date: r.date, status: r.status, startTime, endTime };
     });
+
+    res.json({ schedules });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch schedule', error: err.message });
+    res.status(500).json({ message: 'Failed to fetch', error: err.message });
   }
 });
 // Request Leave Endpoint
