@@ -29,14 +29,18 @@ app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const result = await db.query('SELECT password_hash, role, fullname FROM users WHERE email = $1', [email]);
+    const result = await db.query(
+      'SELECT password_hash, role, fullname, image_url FROM users WHERE email = $1',
+      [email]
+    );
 
     if (result.rows.length > 0 && await bcrypt.compare(password, result.rows[0].password_hash)) {
       res.json({
         message: 'Login successful',
-        email: email, // เพิ่ม email ลงใน response
+        email, // echo back email
         role: result.rows[0].role,
-        fullname: result.rows[0].fullname
+        fullname: result.rows[0].fullname,
+        imageUrl: result.rows[0].image_url ?? null
       });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
