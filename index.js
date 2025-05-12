@@ -117,11 +117,27 @@ app.get('/api/schedule', async (req, res) => {
   try {
     const q = email === '*'
       ? await db.query(
-          'SELECT email, date, status, time_range FROM schedules WHERE date = $1 ORDER BY email',
+          `SELECT s.email,
+                  s.date,
+                  s.status,
+                  s.time_range,
+                  COALESCE(u.image_url,'') AS image_url
+             FROM schedules s
+             LEFT JOIN users u ON u.email = s.email
+            WHERE s.date = $1
+            ORDER BY s.email`,
           [date]
         )
       : await db.query(
-          'SELECT email, date, status, time_range FROM schedules WHERE email = $1 AND date = $2',
+          `SELECT s.email,
+                  s.date,
+                  s.status,
+                  s.time_range,
+                  COALESCE(u.image_url,'') AS image_url
+             FROM schedules s
+             LEFT JOIN users u ON u.email = s.email
+            WHERE s.email = $1
+              AND s.date  = $2`,
           [email, date]
         );
 
@@ -131,7 +147,7 @@ app.get('/api/schedule', async (req, res) => {
     // ส่งออกเป็น array สม่ำเสมอ
     const schedules = q.rows.map(r => {
       const [startTime, endTime] = r.time_range.split(' - ');
-      return { email: r.email, date: r.date, status: r.status, startTime, endTime };
+      return { email: r.email, date: r.date, status: r.status, startTime, endTime, imageUrl: r.image_url };
     });
 
     res.json({ schedules });
