@@ -350,6 +350,30 @@ app.get('/api/users', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch users', error: err.message });
   }
 });
+
+app.delete('/api/users/:email', async (req, res) => {
+  const email = decodeURIComponent(req.params.email || '').trim();
+
+  if (!email) {
+    return res.status(400).json({ message: 'Missing e‑mail in URL' });
+  }
+
+  try {
+    // ถ้ามีตารางอื่นที่อ้างถึง users.email และตั้ง ON DELETE CASCADE ไว้
+    // ก็พอ ‑– ถ้าไม่มีก็ลบตารางลูก (schedule ฯลฯ) ก่อนค่อยลบ users
+    const q = await db.query('DELETE FROM users WHERE email = $1', [email]);
+
+    if (q.rowCount === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted' });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: 'Delete failed', error: err.message });
+  }
+});
 // ────────────────────────────────
 
 // Start the Server
