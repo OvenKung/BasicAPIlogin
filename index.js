@@ -308,6 +308,21 @@ app.post('/api/checkin', async (req, res) => {
   }
 });
 
+// ────────────────────────────────
+// Get all users (email, fullname, role, image)
+// GET /api/users
+app.get('/api/users', async (req, res) => {
+  try {
+    const q = await db.query(
+      "SELECT email, fullname, role, COALESCE(image_url, '') AS image_url FROM users ORDER BY fullname"
+    );
+    res.json({ users: q.rows }); // return { users: [...] }
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch users', error: err.message });
+  }
+});
+// ────────────────────────────────
+
 // Start the Server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
