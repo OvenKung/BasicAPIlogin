@@ -308,6 +308,35 @@ app.post('/api/checkin', async (req, res) => {
   }
 });
 
+// POST /api/update-user
+// body: { email, fullname, role, imageUrl, password? }
+app.post('/api/update-user', async (req, res) => {
+  const { email, fullname, role, imageUrl, password } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Missing email' });
+  }
+
+  try {
+    if (password && password.trim() !== '') {
+      const hash = await bcrypt.hash(password, 10);
+      await db.query(
+        'UPDATE users SET fullname = $1, role = $2, image_url = $3, password_hash = $4 WHERE email = $5',
+        [fullname, role, imageUrl, hash, email]
+      );
+    } else {
+      await db.query(
+        'UPDATE users SET fullname = $1, role = $2, image_url = $3 WHERE email = $4',
+        [fullname, role, imageUrl, email]
+      );
+    }
+
+    res.json({ message: 'User updated' });
+  } catch (err) {
+    res.status(500).json({ message: 'Update failed', error: err.message });
+  }
+});
+
 // ────────────────────────────────
 // Get all users (email, fullname, role, image)
 // GET /api/users
