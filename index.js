@@ -216,6 +216,37 @@ app.post('/api/add-schedule', async (req, res) => {
   }
 });
 
+// Update Schedule Endpoint
+// Body: { email, oldDate, oldTimeRange, date, timeRange, status }
+app.post('/api/update-schedule', async (req, res) => {
+  const { email, oldDate, oldTimeRange, date, timeRange, status } = req.body;
+
+  if (!email || !oldDate || !oldTimeRange || !date || !timeRange || !status) {
+    return res.status(400).json({ message: 'Missing fields' });
+  }
+
+  try {
+    const result = await db.query(
+      `UPDATE schedules
+          SET date = $1,
+              time_range = $2,
+              status = $3
+        WHERE email      = $4
+          AND date       = $5
+          AND time_range = $6`,
+      [date, timeRange, status, email, oldDate, oldTimeRange]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ message: 'Schedule not found to update' });
+    }
+
+    res.json({ message: 'Schedule updated' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update schedule', error: err.message });
+  }
+});
+
 // Approve Leave Endpoint
 // Body: { email: string, date: 'YYYY-MM-DD' }
 app.post('/api/approve-leave', async (req, res) => {
