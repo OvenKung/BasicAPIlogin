@@ -84,13 +84,13 @@ app.post('/api/schedule', async (req, res) => {
     if (email && email !== '*') {
       console.log("🔍 Query for specific user...");
       result = await db.query(
-        'SELECT email, date, status, time_range FROM schedules WHERE email = $1 ORDER BY date',
+        'SELECT email, date, status, time_range, COALESCE(reason, \'\') AS reason FROM schedules WHERE email = $1 ORDER BY date',
         [email]
       );
     } else {
       console.log("🔍 Query for all pending...");
       result = await db.query(
-        "SELECT email, date, status, time_range FROM schedules WHERE status = 'pending' ORDER BY date"
+        "SELECT email, date, status, time_range, COALESCE(reason, '') AS reason FROM schedules WHERE status = 'pending' ORDER BY date"
       );
     }
 
@@ -100,7 +100,8 @@ app.post('/api/schedule', async (req, res) => {
       email: row.email,
       date: row.date,
       status: row.status,
-      timeRange: row.time_range
+      timeRange: row.time_range,
+      reason: row.reason
     }));
 
     res.json({ schedules });
@@ -121,6 +122,7 @@ app.get('/api/schedule', async (req, res) => {
                   s.date,
                   s.status,
                   s.time_range,
+                  COALESCE(s.reason,'') AS reason,
                   COALESCE(u.image_url,'') AS image_url
              FROM schedules s
              LEFT JOIN users u ON u.email = s.email
@@ -133,6 +135,7 @@ app.get('/api/schedule', async (req, res) => {
                   s.date,
                   s.status,
                   s.time_range,
+                  COALESCE(s.reason,'') AS reason,
                   COALESCE(u.image_url,'') AS image_url
              FROM schedules s
              LEFT JOIN users u ON u.email = s.email
@@ -147,7 +150,7 @@ app.get('/api/schedule', async (req, res) => {
     // ส่งออกเป็น array สม่ำเสมอ
     const schedules = q.rows.map(r => {
       const [startTime, endTime] = r.time_range.split(' - ');
-      return { email: r.email, date: r.date, status: r.status, startTime, endTime, imageUrl: r.image_url };
+      return { email: r.email, date: r.date, status: r.status, startTime, endTime, imageUrl: r.image_url, reason: r.reason };
     });
 
     res.json({ schedules });
@@ -160,19 +163,19 @@ app.get('/api/schedule', async (req, res) => {
 // If the schedule row already exists, change its status to 'pending'.
 // Otherwise insert a new row with status = 'pending'.
 app.post('/api/request-leave', async (req, res) => {
-  const { email, date, timeRange = '09:00 - 17:00' } = req.body;
+  const { email, date, timeRange = '09:00 - 17:00', reason = '' } = req.body;
 
   try {
     const updateResult = await db.query(
-      'UPDATE schedules SET status = $1 WHERE email = $2 AND date = $3',
-      ['pending', email, date]
+      'UPDATE schedules SET status = $1, reason = $2 WHERE email = $3 AND date = $4',
+      ['pending', reason, email, date]
     );
 
     // If no row was updated, create one.
     if (updateResult.rowCount === 0) {
       await db.query(
-        'INSERT INTO schedules (email, date, status, time_range) VALUES ($1, $2, $3, $4)',
-        [email, date, 'pending', timeRange]
+        'INSERT INTO schedules (email, date, status, time_range, reason) VALUES ($1, $2, $3, $4, $5)',
+        [email, date, 'pending', timeRange, reason]
       );
     }
 
