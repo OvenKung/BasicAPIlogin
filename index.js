@@ -31,30 +31,34 @@ app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const result = await db.query(
-      'SELECT password_hash, role, fullname, image_url, status FROM users WHERE email = $1',
-      [email]
+    const q = await db.query(
+      'SELECT password_hash, role, fullname, image_url, COALESCE(status, \'active\') AS status FROM users WHERE email = $1',
+      [email.trim()]
     );
 
-    if (result.rows.length > 0) {
-      if (result.rows[0].status === 'disabled') {
-        return res.status(403).json({ message: 'Account disabled' });
-      }
-      if (await bcrypt.compare(password, result.rows[0].password_hash)) {
-        res.json({
-          message: 'Login successful',
-          email, // echo back email
-          role: result.rows[0].role,
-          fullname: result.rows[0].fullname,
-          imageUrl: result.rows[0].image_url ?? null,
-          status: result.rows[0].status
-        });
-      } else {
-        res.status(401).json({ message: 'Invalid credentials' });
-      }
-    } else {
-      res.status(401).json({ message: 'Invalid credentials' });
-    }
+    if (q.rows.length === 0)
+      return res.status(401).json({ message: 'Invalid credentials' });
+
+    const row    = q.rows[0];
+    const status = (row.status || 'active').toString().trim().toLowerCase();
+
+    /*  🔒  If not explicitly “active” → reject login  */
+    if (status !== 'active')
+      return res.status(403).json({ message: 'Account disabled' });
+
+    /*  check password  */
+    const ok = await bcrypt.compare(password, row.password_hash);
+    if (!ok)
+      return res.status(401).json({ message: 'Invalid credentials' });
+
+    res.json({
+      message : 'Login successful',
+      email   : email.trim(),
+      role    : row.role,
+      fullname: row.fullname,
+      imageUrl: row.image_url ?? null,
+      status  : status
+    });
   } catch (err) {
     res.status(500).json({ message: 'Server error', error: err.message });
   }
