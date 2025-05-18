@@ -4,19 +4,21 @@ const db = require('./db');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 
+// Ensure the users table has a 'status' TEXT column with values like 'active' | 'disabled'
+
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Register Endpoint
+// Register (status = active)
 app.post('/api/register', async (req, res) => {
   const { email, password, role = 'user', fullname, imageUrl } = req.body;
   const hash = await bcrypt.hash(password, 10);
 
   try {
     await db.query(
-      'INSERT INTO users (email, password_hash, role, fullname, image_url) VALUES ($1, $2, $3, $4, $5)',
-      [email, hash, role, fullname, imageUrl]
+      'INSERT INTO users (email, password_hash, role, fullname, image_url, status) VALUES ($1, $2, $3, $4, $5, $6)',
+      [email, hash, role, fullname, imageUrl, 'active']
     );
     res.json({ message: 'User registered' });
   } catch (err) {
@@ -30,18 +32,26 @@ app.post('/api/login', async (req, res) => {
 
   try {
     const result = await db.query(
-      'SELECT password_hash, role, fullname, image_url FROM users WHERE email = $1',
+      'SELECT password_hash, role, fullname, image_url, status FROM users WHERE email = $1',
       [email]
     );
 
-    if (result.rows.length > 0 && await bcrypt.compare(password, result.rows[0].password_hash)) {
-      res.json({
-        message: 'Login successful',
-        email, // echo back email
-        role: result.rows[0].role,
-        fullname: result.rows[0].fullname,
-        imageUrl: result.rows[0].image_url ?? null
-      });
+    if (result.rows.length > 0) {
+      if (result.rows[0].status === 'disabled') {
+        return res.status(403).json({ message: 'Account disabled' });
+      }
+      if (await bcrypt.compare(password, result.rows[0].password_hash)) {
+        res.json({
+          message: 'Login successful',
+          email, // echo back email
+          role: result.rows[0].role,
+          fullname: result.rows[0].fullname,
+          imageUrl: result.rows[0].image_url ?? null,
+          status: result.rows[0].status
+        });
+      } else {
+        res.status(401).json({ message: 'Invalid credentials' });
+      }
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -372,12 +382,11 @@ app.post('/api/update-user', async (req, res) => {
 });
 
 // ────────────────────────────────
-// Get all users (email, fullname, role, image)
-// GET /api/users
+// Get all users (includes status)
 app.get('/api/users', async (req, res) => {
   try {
     const q = await db.query(
-      "SELECT email, fullname, role, COALESCE(image_url, '') AS image_url FROM users ORDER BY fullname"
+      "SELECT email, fullname, role, COALESCE(image_url, '') AS image_url, status FROM users ORDER BY fullname"
     );
     res.json({ users: q.rows }); // return { users: [...] }
   } catch (err) {
@@ -393,19 +402,17 @@ app.delete('/api/users/:email', async (req, res) => {
   }
 
   try {
-    // ถ้ามีตารางอื่นที่อ้างถึง users.email และตั้ง ON DELETE CASCADE ไว้
-    // ก็พอ ‑– ถ้าไม่มีก็ลบตารางลูก (schedule ฯลฯ) ก่อนค่อยลบ users
-    const q = await db.query('DELETE FROM users WHERE email = $1', [email]);
+    const q = await db.query(
+      'UPDATE users SET status = $1 WHERE email = $2 AND status <> $1',
+      ['disabled', email]
+    );
 
-    if (q.rowCount === 0) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    if (q.rowCount === 0)
+      return res.status(404).json({ message: 'User not found or already disabled' });
 
-    res.json({ message: 'User deleted' });
+    res.json({ message: 'User disabled' });
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: 'Delete failed', error: err.message });
+    res.status(500).json({ message: 'Disable failed', error: err.message });
   }
 });
 // ────────────────────────────────
