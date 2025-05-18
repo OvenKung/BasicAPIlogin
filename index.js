@@ -355,25 +355,46 @@ app.post('/api/checkin', async (req, res) => {
 // POST /api/update-user
 // body: { email, fullname, role, imageUrl, password? }
 app.post('/api/update-user', async (req, res) => {
-  const { email, fullname, role, imageUrl, password } = req.body;
+  const { email, fullname, role, imageUrl, status, password } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ message: 'Missing email' });
+  /* ------ ตรวจ params ------ */
+  if (!email) return res.status(400).json({ message: 'Missing email' });
+
+  /* ------ สร้าง SET clause แบบ dynamic ------ */
+  const fields   = [];
+  const values   = [];
+  let   idx      = 1;            // $1, $2, …
+
+  const pushSet = (col, val) => {
+    fields.push(`${col} = $${idx}`);
+    values.push(val);
+    idx++;
+  };
+
+  if (fullname !== undefined) pushSet('fullname' , fullname);
+  if (role     !== undefined) pushSet('role'     , role);
+  if (imageUrl !== undefined) pushSet('image_url', imageUrl);
+  if (status   !== undefined) pushSet('status'   , status);
+
+  if (password && password.trim() !== '') {
+    const hash = await bcrypt.hash(password, 10);
+    pushSet('password_hash', hash);
   }
 
+  if (fields.length === 0)
+    return res.status(400).json({ message: 'Nothing to update' });
+
+  /* push email เป็น parameter สุดท้าย */
+  values.push(email);
+
   try {
-    if (password && password.trim() !== '') {
-      const hash = await bcrypt.hash(password, 10);
-      await db.query(
-        'UPDATE users SET fullname = $1, role = $2, image_url = $3, password_hash = $4 WHERE email = $5',
-        [fullname, role, imageUrl, hash, email]
-      );
-    } else {
-      await db.query(
-        'UPDATE users SET fullname = $1, role = $2, image_url = $3 WHERE email = $4',
-        [fullname, role, imageUrl, email]
-      );
-    }
+    const q = await db.query(
+      `UPDATE users SET ${fields.join(', ')} WHERE email = $${idx}`,
+      values
+    );
+
+    if (q.rowCount === 0)
+      return res.status(404).json({ message: 'User not found' });
 
     res.json({ message: 'User updated' });
   } catch (err) {
